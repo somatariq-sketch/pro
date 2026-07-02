@@ -149,9 +149,37 @@ function ensureUserRoleSchema(PDO $pdo): void {
     $pdo->exec("UPDATE users SET role = 'customer' WHERE workspace_id = 0 AND (role IS NULL OR role = '')");
 }
 
+function ensureOrdersSchema(PDO $pdo): void {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        workspace_id INT NOT NULL,
+        customer_id INT NOT NULL,
+        customer_name VARCHAR(150) NULL,
+        customer_phone VARCHAR(50) NULL,
+        delivery_note TEXT NULL,
+        payment_method VARCHAR(30) NOT NULL DEFAULT 'cash_on_delivery',
+        status VARCHAR(30) NOT NULL DEFAULT 'pending',
+        total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        currency VARCHAR(10) NOT NULL DEFAULT 'IQD',
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        product_id INT NULL,
+        product_name VARCHAR(255) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+        total_price DECIMAL(12,2) NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
 ensureWorkspaceSchema($pdo);
 ensureSubscriptionSchema($pdo);
 ensureUserRoleSchema($pdo);
+ensureOrdersSchema($pdo);
 
 function hashPassword(string $password): string {
     return password_hash($password, PASSWORD_BCRYPT);
@@ -371,6 +399,29 @@ $translations = [
         'analytics_nav' => 'Analytics',
         'settings_nav' => 'Settings',
         'orders_nav' => 'Orders',
+        'order_now' => 'Order now',
+        'place_order' => 'Place order',
+        'order_status_pending' => 'Pending',
+        'order_status_confirmed' => 'Confirmed',
+        'order_status_fulfilled' => 'Fulfilled',
+        'order_status_cancelled' => 'Cancelled',
+        'delivery_note_label' => 'Delivery address / pickup note',
+        'delivery_note_ph' => 'Where should the seller deliver this, or how will you pick it up?',
+        'payment_method_label' => 'Payment method',
+        'cash_on_delivery' => 'Cash on delivery',
+        'bank_transfer' => 'Bank transfer',
+        'order_confirmed_title' => 'Order placed!',
+        'order_confirmed_text' => 'Your order has been sent to the seller. Message them to arrange payment and delivery.',
+        'my_orders' => 'My orders',
+        'no_orders_yet' => 'No orders yet.',
+        'seller_orders_title' => 'Orders',
+        'no_seller_orders' => 'No orders yet.',
+        'order_items_label' => 'Items',
+        'update_status' => 'Update status',
+        'order_total_label' => 'Total',
+        'order_login_required' => 'Please log in as a customer first to place an order.',
+        'order_placed_ok' => 'Order placed successfully.',
+        'order_status_updated' => 'Order status updated.',
         'public_profile' => 'Public profile',
         'preview_below' => 'Profile preview below',
         'brand_color_hint' => 'A brand color version with your current theme.',
@@ -657,6 +708,29 @@ $translations = [
         'analytics_nav' => 'ئامار',
         'settings_nav' => 'ڕێکخستن',
         'orders_nav' => 'داواکاریەکان',
+        'order_now' => 'داواکردن',
+        'place_order' => 'داواکاری بنێرە',
+        'order_status_pending' => 'چاوەڕوانە',
+        'order_status_confirmed' => 'پەسەندکراوە',
+        'order_status_fulfilled' => 'گەیشتووە',
+        'order_status_cancelled' => 'هەڵوەشێنراوەتەوە',
+        'delivery_note_label' => 'ناونیشانی گەیاندن / تێبینی وەرگرتن',
+        'delivery_note_ph' => 'لەکوێ فرۆشیار بەرهەمەکە بگەیەنێت، یان چۆن وەریدەگریت؟',
+        'payment_method_label' => 'شێوازی پارەدان',
+        'cash_on_delivery' => 'پارەدان لە کاتی گەیاندن',
+        'bank_transfer' => 'گواستنەوەی بانکی',
+        'order_confirmed_title' => 'داواکاریەکە نێردرا!',
+        'order_confirmed_text' => 'داواکاریەکەت بۆ فرۆشیار نێردرا. پەیوەندی بکە بۆ ڕێکخستنی پارەدان و گەیاندن.',
+        'my_orders' => 'داواکاریەکانم',
+        'no_orders_yet' => 'هێشتا هیچ داواکاریەک نییە.',
+        'seller_orders_title' => 'داواکاریەکان',
+        'no_seller_orders' => 'هێشتا هیچ داواکاریەک نییە.',
+        'order_items_label' => 'بابەتەکان',
+        'update_status' => 'نوێکردنەوەی دۆخ',
+        'order_total_label' => 'کۆی گشتی',
+        'order_login_required' => 'تکایە یەکەم جار وەک کڕیار بچۆرەژوورەوە بۆ ناردنی داواکاری.',
+        'order_placed_ok' => 'داواکاریەکە بە سەرکەوتوویی نێردرا.',
+        'order_status_updated' => 'دۆخی داواکاری نوێکرایەوە.',
         'public_profile' => 'پڕۆفایلی گشتی',
         'preview_below' => 'پێشبینی پڕۆفایل لەژێر',
         'brand_color_hint' => 'وەشانێکی ڕەنگی برند لەگەڵ شێوازی ئێستایت.',
@@ -939,6 +1013,29 @@ $translations = [
         'analytics_nav' => 'التحليلات',
         'settings_nav' => 'الإعدادات',
         'orders_nav' => 'الطلبات',
+        'order_now' => 'اطلب الآن',
+        'place_order' => 'إرسال الطلب',
+        'order_status_pending' => 'قيد الانتظار',
+        'order_status_confirmed' => 'مؤكد',
+        'order_status_fulfilled' => 'تم التنفيذ',
+        'order_status_cancelled' => 'ملغى',
+        'delivery_note_label' => 'عنوان التوصيل / ملاحظة الاستلام',
+        'delivery_note_ph' => 'أين يوصّل البائع الطلب، أو كيف ستستلمه؟',
+        'payment_method_label' => 'طريقة الدفع',
+        'cash_on_delivery' => 'الدفع عند الاستلام',
+        'bank_transfer' => 'تحويل بنكي',
+        'order_confirmed_title' => 'تم إرسال الطلب!',
+        'order_confirmed_text' => 'تم إرسال طلبك إلى البائع. تواصل معه لترتيب الدفع والتوصيل.',
+        'my_orders' => 'طلباتي',
+        'no_orders_yet' => 'لا توجد طلبات بعد.',
+        'seller_orders_title' => 'الطلبات',
+        'no_seller_orders' => 'لا توجد طلبات بعد.',
+        'order_items_label' => 'العناصر',
+        'update_status' => 'تحديث الحالة',
+        'order_total_label' => 'الإجمالي',
+        'order_login_required' => 'يرجى تسجيل الدخول كعميل أولاً لإتمام الطلب.',
+        'order_placed_ok' => 'تم إرسال الطلب بنجاح.',
+        'order_status_updated' => 'تم تحديث حالة الطلب.',
         'public_profile' => 'الملف العام',
         'preview_below' => 'معاينة الملف أدناه',
         'brand_color_hint' => 'نسخة بلون العلامة التجارية مع سمتك الحالية.',
@@ -1425,10 +1522,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("SELECT id,name,email FROM users WHERE email = ? AND workspace_id = 0 LIMIT 1");
         $stmt->execute([$email]);
         $u = $stmt->fetch();
+      $registerIdentifier = 'register:' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
       if (isLoginLocked($pdo, 'login:' . $email)) {
         $login_error = 'زۆر هەوڵت داوە، تکایە دوای ' . LOGIN_LOCKOUT_MINUTES . ' خولەک تاقی بکەرەوە';
+    } elseif (!$u && isLoginLocked($pdo, $registerIdentifier)) {
+        $login_error = 'زۆر هەژماری نوێ لەم IP‌یەوە دروستکراوە، تکایە دوای ' . LOGIN_LOCKOUT_MINUTES . ' خولەک تاقی بکەرەوە';
     } else {
         if (!$u) {
+                recordLoginAttempt($pdo, $registerIdentifier, false);
                 $ins = $pdo->prepare("INSERT INTO users (workspace_id,name,email,password,role,created_at) VALUES (0,?,?,?,?,NOW())");
                 $ins->execute([$name, $email, '', 'customer']);
                 $id = $pdo->lastInsertId();
@@ -1760,6 +1861,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (isset($_POST['customer_place_order'])) {
+        if (!$auth || $auth['type'] !== 'customer') {
+            $order_error = translate('order_login_required', $lang, $translations);
+        } else {
+            $orderWorkspaceId = intval($_POST['order_workspace_id'] ?? 0);
+            $orderProductId = intval($_POST['order_product_id'] ?? 0);
+            $orderQuantity = max(1, intval($_POST['order_quantity'] ?? 1));
+            $deliveryNote = trim($_POST['order_delivery_note'] ?? '');
+            $paymentMethod = in_array($_POST['order_payment_method'] ?? '', ['cash_on_delivery', 'bank_transfer'], true) ? $_POST['order_payment_method'] : 'cash_on_delivery';
+            $orderCustomerPhone = trim($_POST['order_customer_phone'] ?? '');
+
+            $orderProduct = $orderWorkspaceId > 0 ? productById($pdo, $orderWorkspaceId, $orderProductId) : null;
+            if (!$orderProduct) {
+                $order_error = 'Product not found.';
+            } else {
+                $unitPrice = floatval($orderProduct['price']);
+                $totalAmount = $unitPrice * $orderQuantity;
+                $ins = $pdo->prepare("INSERT INTO orders (workspace_id, customer_id, customer_name, customer_phone, delivery_note, payment_method, status, total_amount, currency, created_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 'IQD', NOW())");
+                $ins->execute([$orderWorkspaceId, intval($auth['id']), $auth['name'], $orderCustomerPhone, $deliveryNote, $paymentMethod, $totalAmount]);
+                $newOrderId = intval($pdo->lastInsertId());
+                $itemIns = $pdo->prepare("INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)");
+                $itemIns->execute([$newOrderId, $orderProduct['id'], $orderProduct['name'], $orderQuantity, $unitPrice, $totalAmount]);
+
+                $orderedWorkspace = workspaceById($pdo, $orderWorkspaceId);
+                $order_confirmed = [
+                    'id' => $newOrderId,
+                    'product_name' => $orderProduct['name'],
+                    'quantity' => $orderQuantity,
+                    'total' => $totalAmount,
+                    'whatsapp' => whatsappLink(
+                        $orderedWorkspace['phone'] ?? $defaultPhone,
+                        sprintf('Hello, I just placed order #%d for %d x %s (%s IQD total) via Reyonic. Payment method: %s.', $newOrderId, $orderQuantity, $orderProduct['name'], number_format($totalAmount, 0), $paymentMethod === 'bank_transfer' ? 'Bank transfer' : 'Cash on delivery')
+                    ),
+                ];
+            }
+        }
+    }
+
+    if (isset($_POST['seller_update_order_status']) && $auth && $auth['type'] === 'seller') {
+        $w = intval($auth['workspace_id']);
+        $orderId = intval($_POST['order_id'] ?? 0);
+        $newStatus = in_array($_POST['order_status'] ?? '', ['pending', 'confirmed', 'fulfilled', 'cancelled'], true) ? $_POST['order_status'] : 'pending';
+        $upd = $pdo->prepare("UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ? AND workspace_id = ?");
+        $upd->execute([$newStatus, $orderId, $w]);
+        $orders_message = translate('order_status_updated', $lang, $translations);
+    }
+
     if (isset($_POST['seller_add_sale']) && $auth && $auth['type'] === 'seller') {
         $w = intval($auth['workspace_id']);
         $productId = intval($_POST['sale_product_id'] ?? 0);
@@ -1850,6 +1998,7 @@ $sortBy = trim($_GET['sort'] ?? 'newest');
 $selectedProductId = isset($_GET['product']) ? intval($_GET['product']) : 0;
 $selectedWorkspace = null;
 $showMyShop = isset($_GET['my_shop']) && $auth && $auth['type'] === 'seller';
+$showMyOrders = isset($_GET['my_orders']) && $auth && $auth['type'] === 'customer';
 $showAdmin = isset($_GET['admin']) && $auth && $auth['type'] === 'admin';
 $sellerWorkspace = null;
 $salesFrom = trim($_GET['sale_from'] ?? '');
@@ -2018,6 +2167,76 @@ function productById(PDO $pdo, $workspace_id, $product_id) {
     $stmt = $pdo->prepare("SELECT p.*, c.name AS category_name, pc.name AS parent_category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN categories pc ON c.parent_id = pc.id WHERE p.workspace_id = ? AND p.id = ? LIMIT 1");
     $stmt->execute([$workspace_id, $product_id]);
     return $stmt->fetch();
+}
+
+/* -------------------------
+   Orders
+   ------------------------- */
+function ordersByWorkspace(PDO $pdo, int $workspace_id): array {
+    $stmt = $pdo->prepare("SELECT * FROM orders WHERE workspace_id = ? ORDER BY id DESC");
+    $stmt->execute([$workspace_id]);
+    return $stmt->fetchAll();
+}
+
+function ordersByCustomer(PDO $pdo, int $customer_id): array {
+    $stmt = $pdo->prepare("SELECT o.*, w.store_name, w.name AS workspace_name FROM orders o LEFT JOIN workspaces w ON o.workspace_id = w.id WHERE o.customer_id = ? ORDER BY o.id DESC");
+    $stmt->execute([$customer_id]);
+    return $stmt->fetchAll();
+}
+
+function orderItemsByOrder(PDO $pdo, int $order_id): array {
+    $stmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC");
+    $stmt->execute([$order_id]);
+    return $stmt->fetchAll();
+}
+
+function orderById(PDO $pdo, int $workspace_id, int $order_id) {
+    $stmt = $pdo->prepare("SELECT * FROM orders WHERE workspace_id = ? AND id = ? LIMIT 1");
+    $stmt->execute([$workspace_id, $order_id]);
+    return $stmt->fetch();
+}
+
+function translateOrderStatus(string $status, string $lang, array $translations): string {
+    $map = ['pending' => 'order_status_pending', 'confirmed' => 'order_status_confirmed', 'fulfilled' => 'order_status_fulfilled', 'cancelled' => 'order_status_cancelled'];
+    return translate($map[$status] ?? $status, $lang, $translations);
+}
+
+function renderOrderNowForm(array $product, array $workspace, ?array $auth, string $lang, array $translations): string {
+    $wid = intval($workspace['id']);
+    $pid = intval($product['id']);
+    if (!$auth || $auth['type'] !== 'customer') {
+        return '<button type="button" class="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20" onclick="document.getElementById(\'loginModal\').style.display=\'flex\'">🛒 ' . e(translate('order_now', $lang, $translations)) . '</button>';
+    }
+    ob_start();
+    ?>
+    <details class="mt-2">
+      <summary class="cursor-pointer inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20">🛒 <?= e(translate('order_now', $lang, $translations)) ?></summary>
+      <form method="post" class="dashboard-panel mt-2 space-y-2">
+        <?= csrfField() ?>
+        <input type="hidden" name="order_workspace_id" value="<?= $wid ?>">
+        <input type="hidden" name="order_product_id" value="<?= $pid ?>">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs small-muted"><?= e(translate('quantity', $lang, $translations)) ?></label>
+            <input type="number" name="order_quantity" min="1" value="1" class="input-dark w-full">
+          </div>
+          <div>
+            <label class="text-xs small-muted"><?= e(translate('payment_method_label', $lang, $translations)) ?></label>
+            <select name="order_payment_method" class="input-dark w-full">
+              <option value="cash_on_delivery"><?= e(translate('cash_on_delivery', $lang, $translations)) ?></option>
+              <option value="bank_transfer"><?= e(translate('bank_transfer', $lang, $translations)) ?></option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs small-muted"><?= e(translate('delivery_note_label', $lang, $translations)) ?></label>
+          <textarea name="order_delivery_note" rows="2" class="input-dark w-full" placeholder="<?= e(translate('delivery_note_ph', $lang, $translations)) ?>"></textarea>
+        </div>
+        <button name="customer_place_order" class="px-3 py-2 bg-amber-600 rounded text-sm w-full"><?= e(translate('place_order', $lang, $translations)) ?></button>
+      </form>
+    </details>
+    <?php
+    return ob_get_clean();
 }
 
 /* -------------------------
@@ -2252,6 +2471,8 @@ function qrDataUrl(string $text): string {
             <?php elseif ($auth['type'] === 'seller'): ?>
               <a href="?my_shop=1&lang=<?= urlencode($lang) ?>" class="btn-primary"><?= e(translate('my_shop', $lang, $translations)) ?></a>
               <button id="openAdminLogin" class="btn-primary"><?= e(translate('admin', $lang, $translations)) ?></button>
+            <?php elseif ($auth['type'] === 'customer'): ?>
+              <a href="?my_orders=1&lang=<?= urlencode($lang) ?>" class="btn-primary"><?= e(translate('my_orders', $lang, $translations)) ?></a>
             <?php endif; ?>
             <form method="post" style="display:inline">
               <?= csrfField() ?>
@@ -2267,6 +2488,48 @@ function qrDataUrl(string $text): string {
       <?php if (!($auth && ($auth['type'] === 'seller'))): ?>
       <?php endif; ?>
     </div>
+
+    <?php if (!empty($order_confirmed)): ?>
+      <div class="card mt-4 border-emerald-400/30">
+        <div class="font-semibold text-emerald-300">✅ <?= e(translate('order_confirmed_title', $lang, $translations)) ?></div>
+        <div class="small-muted text-sm mt-1"><?= e(translate('order_confirmed_text', $lang, $translations)) ?></div>
+        <div class="small-muted text-sm mt-2">#<?= $order_confirmed['id'] ?> — <?= e($order_confirmed['product_name']) ?> × <?= $order_confirmed['quantity'] ?> — <?= e(number_format($order_confirmed['total'], 0)) ?> IQD</div>
+        <a class="mt-3 inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20" href="<?= e($order_confirmed['whatsapp']) ?>" target="_blank" rel="noopener noreferrer">💬 <?= e(translate('contact_store', $lang, $translations)) ?></a>
+      </div>
+    <?php elseif (!empty($order_error)): ?>
+      <div class="card mt-4 border-rose-400/30">
+        <div class="small-muted text-rose-300"><?= e($order_error) ?></div>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($showMyOrders): ?>
+      <section class="card mt-4">
+        <div class="font-semibold mb-3"><?= e(translate('my_orders', $lang, $translations)) ?></div>
+        <?php $myOrders = ordersByCustomer($pdo, intval($auth['id'])); ?>
+        <?php if (empty($myOrders)): ?>
+          <div class="small-muted"><?= e(translate('no_orders_yet', $lang, $translations)) ?></div>
+        <?php else: ?>
+          <div class="space-y-2">
+            <?php foreach ($myOrders as $order): ?>
+              <?php $orderItems = orderItemsByOrder($pdo, intval($order['id'])); ?>
+              <div class="rounded-lg border border-white/10 p-3">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="font-semibold text-sm">#<?= intval($order['id']) ?> — <?= e($order['store_name'] ?: $order['workspace_name']) ?></div>
+                    <div class="small-muted text-xs"><?= e($order['created_at']) ?></div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-semibold"><?= e(number_format((float) $order['total_amount'], 0)) ?> IQD</div>
+                    <div class="small-muted text-xs"><?= e(translateOrderStatus((string) $order['status'], $lang, $translations)) ?></div>
+                  </div>
+                </div>
+                <div class="small-muted text-xs mt-2"><?php foreach ($orderItems as $idx => $item): ?><?= $idx > 0 ? ', ' : '' ?><?= e($item['product_name']) ?> ×<?= intval($item['quantity']) ?><?php endforeach; ?></div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </section>
+    <?php endif; ?>
 
     <section class="hero-section mb-8">
       <div class="grid gap-8 xl:grid-cols-[1.1fr_0.9fr] xl:items-center">
@@ -2464,6 +2727,7 @@ function qrDataUrl(string $text): string {
                   <a class="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20" href="?shop=<?= urlencode($selectedWorkspace['slug']) ?>&lang=<?= urlencode($lang) ?>&product=<?= intval($p['id']) ?>">🔎 <?= e(translate('view_details', $lang, $translations)) ?></a>
                   <a class="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20" href="<?= e(whatsappLink($selectedWorkspace['phone'] ?: $defaultPhone, 'Hello, I would like more information about ' . $p['name'] . '.')) ?>" target="_blank" rel="noopener noreferrer">💬 <?= e(translate('contact_store', $lang, $translations)) ?></a>
                 </div>
+                <?= renderOrderNowForm($p, $selectedWorkspace, $auth, $lang, $translations) ?>
               </div>
             <?php endforeach; ?>
           </div>
@@ -2676,6 +2940,7 @@ function qrDataUrl(string $text): string {
             <div class="mt-4 flex flex-wrap gap-2">
               <a class="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20" href="<?= e(whatsappLink($selectedWorkspace['phone'] ?: $defaultPhone, 'Hello, I would like more information about ' . $selectedProduct['name'] . '.')) ?>" target="_blank" rel="noopener noreferrer">💬 <?= e(translate('contact_store', $lang, $translations)) ?></a>
             </div>
+            <?= renderOrderNowForm($selectedProduct, $selectedWorkspace, $auth, $lang, $translations) ?>
             <?php $productShareUrl = shareUrl('index.php?shop=' . urlencode($selectedWorkspace['slug']) . '&lang=' . urlencode($lang) . '&product=' . intval($selectedProduct['id'])); ?>
             <div class="mt-3 flex flex-wrap gap-2">
               <a class="text-sm link-muted" href="https://www.facebook.com/sharer/sharer.php?u=<?= rawurlencode($productShareUrl) ?>" target="_blank" rel="noopener noreferrer">📣 <?= e(translate('share_product', $lang, $translations)) ?></a>
@@ -2833,7 +3098,7 @@ function qrDataUrl(string $text): string {
                   <a href="#sellerCategories" class="btn-ghost text-center py-3"><?= e(translate('categories_nav', $lang, $translations)) ?></a>
                   <a href="#sellerAnalytics" class="btn-ghost text-center py-3"><?= e(translate('analytics_nav', $lang, $translations)) ?></a>
                   <a href="#sellerSettings" class="btn-ghost text-center py-3"><?= e(translate('settings_nav', $lang, $translations)) ?></a>
-                  <button type="button" class="btn-ghost text-center py-3" disabled><?= e(translate('orders_nav', $lang, $translations)) ?></button>
+                  <a href="#sellerOrders" class="btn-ghost text-center py-3"><?= e(translate('orders_nav', $lang, $translations)) ?></a>
                   <a href="<?= e($publicShopUrl) ?>" target="_blank" class="btn-ghost text-center py-3"><?= e(translate('public_profile', $lang, $translations)) ?></a>
                 </div>
               </div>
@@ -3019,6 +3284,45 @@ function qrDataUrl(string $text): string {
                   </div><?php endforeach; ?></div><?php endif; ?>
               </div>
             </div>
+          </div>
+
+          <div class="card dashboard-card xl:col-span-2" id="sellerOrders">
+            <div class="font-medium mb-2 text-sm"><?= e(translate('seller_orders_title', $lang, $translations)) ?></div>
+            <?php if (!empty($orders_message)): ?><div class="small-muted mb-2 text-emerald-300"><?= e($orders_message) ?></div><?php endif; ?>
+            <?php $sellerOrders = ordersByWorkspace($pdo, $wId); ?>
+            <?php if (empty($sellerOrders)): ?>
+              <div class="small-muted"><?= e(translate('no_seller_orders', $lang, $translations)) ?></div>
+            <?php else: ?>
+              <div class="space-y-2">
+                <?php foreach ($sellerOrders as $order): ?>
+                  <?php $orderItems = orderItemsByOrder($pdo, intval($order['id'])); ?>
+                  <div class="dashboard-panel">
+                    <div class="flex items-start justify-between gap-2">
+                      <div>
+                        <div class="font-semibold text-sm">#<?= intval($order['id']) ?> — <?= e($order['customer_name']) ?></div>
+                        <div class="small-muted text-xs"><?= e($order['customer_phone']) ?> • <?= e($order['created_at']) ?></div>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-sm font-semibold"><?= e(number_format((float) $order['total_amount'], 0)) ?> IQD</div>
+                        <div class="small-muted text-xs"><?= e(translate($order['payment_method'] === 'bank_transfer' ? 'bank_transfer' : 'cash_on_delivery', $lang, $translations)) ?></div>
+                      </div>
+                    </div>
+                    <?php if (!empty($order['delivery_note'])): ?><div class="small-muted text-xs mt-1"><?= e($order['delivery_note']) ?></div><?php endif; ?>
+                    <div class="small-muted text-xs mt-2"><?= e(translate('order_items_label', $lang, $translations)) ?>: <?php foreach ($orderItems as $idx => $item): ?><?= $idx > 0 ? ', ' : '' ?><?= e($item['product_name']) ?> ×<?= intval($item['quantity']) ?><?php endforeach; ?></div>
+                    <form method="post" class="mt-2 flex flex-wrap gap-2 items-center">
+                      <?= csrfField() ?>
+                      <input type="hidden" name="order_id" value="<?= intval($order['id']) ?>">
+                      <select name="order_status" class="input-dark text-xs">
+                        <?php foreach (['pending', 'confirmed', 'fulfilled', 'cancelled'] as $statusOption): ?>
+                          <option value="<?= $statusOption ?>" <?= $order['status'] === $statusOption ? 'selected' : '' ?>><?= e(translateOrderStatus($statusOption, $lang, $translations)) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <button name="seller_update_order_status" class="px-2 py-1 bg-cyan-600 rounded text-xs"><?= e(translate('update_status', $lang, $translations)) ?></button>
+                    </form>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
           </div>
 
           <div class="card dashboard-card xl:col-span-2">
