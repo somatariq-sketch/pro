@@ -22,14 +22,16 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 } catch (Exception $e) {
+    error_log('DB connection failed: ' . $e->getMessage());
     http_response_code(500);
-    echo "<h2>Database connection failed</h2><pre>" . htmlspecialchars($e->getMessage()) . "</pre>";
+    echo "<h2>We're having a technical issue. Please try again shortly.</h2>";
     exit;
 }
 
 // Now that $pdo exists, ensure security-related tables/columns
 ensureSecurityTables($pdo);
 ensureAdminSecurityColumns($pdo);
+lockDownUploadsFolder(__DIR__ . DIRECTORY_SEPARATOR . 'uploads');
 
 // Start session after session settings were applied
 session_start();
@@ -197,7 +199,7 @@ setcookie('theme', $theme, time() + 60 * 60 * 24 * 365, '/', '', false, true);
 /* -------------------------
    Multi-language support
    ------------------------- */
-$availableLanguages = [' ku' => 'Kurdish', 'en' => 'English', 'ar' => 'Arabic'];
+$availableLanguages = ['ku' => 'Kurdish', 'en' => 'English', 'ar' => 'Arabic'];
 $defaultLanguage = 'ku';
 $lang = strtolower($_GET['lang'] ?? $_SESSION['lang'] ?? $defaultLanguage);
 if (!isset($availableLanguages[$lang])) {
@@ -1432,9 +1434,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id = $pdo->lastInsertId();
             $u = ['id'=>$id,'name'=>$name,'email'=>$email];
         }
-        
+
+        recordLoginAttempt($pdo, 'login:' . $email, true);
         clearLoginAttempts($pdo, 'login:' . $email);
-        
+
         $_SESSION['auth'] = ['type'=>'customer','id'=>intval($u['id']),'name'=>$u['name'],'role'=>'customer'];
         regenerateSessionOnLogin();
         header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
@@ -1449,6 +1452,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sellerName = $email ? explode('@', $email)[0] : 'Seller';
         $isAdminAttempt = $email === strtolower(ADMIN_EMAIL);
 
+        if (isLoginLocked($pdo, 'login:' . $email)) {
+            $login_error = 'زۆر هەوڵت داوە، تکایە دوای ' . LOGIN_LOCKOUT_MINUTES . ' خولەک تاقی بکەرەوە';
+        } else {
+
         $stmt = $pdo->prepare("SELECT id,workspace_id,name,email,store_name,password,role,seller_status FROM users WHERE LOWER(email) = ? LIMIT 1");
         $stmt->execute([$email]);
         $u = $stmt->fetch();
@@ -1456,12 +1463,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($u) {
             if ($isAdminAttempt) {
                 if (!verifyPassword($password, $u['password'])) {
+                    recordLoginAttempt($pdo, 'login:' . $email, false);
                     $login_error = 'Invalid admin credentials.';
                 } else {
                     if ($u['role'] !== 'admin') {
                         $pdo->prepare("UPDATE users SET role = 'admin' WHERE id = ?")->execute([$u['id']]);
                     }
                     ensureSingleAdmin($pdo);
+                    recordLoginAttempt($pdo, 'login:' . $email, true);
+                    clearLoginAttempts($pdo, 'login:' . $email);
                     $_SESSION['auth'] = ['type' => 'admin', 'id' => intval($u['id']), 'name' => $u['name'], 'role' => 'admin'];
                     regenerateSessionOnLogin();
                     header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
@@ -1469,11 +1479,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 if (!verifyPassword($password, $u['password'])) {
+                    recordLoginAttempt($pdo, 'login:' . $email, false);
                     $login_error = "Invalid seller credentials (prototype).";
                 } elseif ($u['role'] === 'seller' && strtolower($u['seller_status'] ?? '') !== 'approved') {
                     $login_error = 'Seller account pending admin approval.';
                 } else {
                     $role = $u['role'] ?: ($u['workspace_id'] > 0 ? 'seller' : 'customer');
+                    recordLoginAttempt($pdo, 'login:' . $email, true);
+                    clearLoginAttempts($pdo, 'login:' . $email);
                     if ($role === 'seller') {
                         $_SESSION['auth'] = ['type' => 'seller', 'id' => intval($u['id']), 'name' => $u['name'], 'workspace_id' => intval($u['workspace_id']), 'role' => 'seller'];
                     } else {
@@ -1487,6 +1500,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($isAdminAttempt) {
     $setupKey = trim($_POST['admin_setup_key'] ?? '');
     if (!hash_equals(ADMIN_SETUP_KEY, $setupKey)) {
+        recordLoginAttempt($pdo, 'login:' . $email, false);
         $login_error = 'کلیلی دامەزراندنی ئەدمین هەڵەیە.';
     } elseif (!isStrongPassword($password)) {
         $login_error = 'Admin password must be at least 12 characters...';
@@ -1503,7 +1517,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
         } else {
+            recordLoginAttempt($pdo, 'login:' . $email, false);
             $login_error = 'Seller account does not exist. Ask the admin to create and approve your account before logging in.';
+        }
+
         }
     }
 
@@ -1562,14 +1579,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $fileName = 'product_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
                 $targetPath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
                 if (!isGenuineImageUpload($file['tmp_name'])) {
-    $product_message = 'ئەم فایلە وێنەیەکی ڕاستەقینە نییە.';
-} else {
-    // move_uploaded_file(...)
-}
-                if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-                    $img = 'uploads/products/' . $fileName;
+                    $product_message = 'ئەم فایلە وێنەیەکی ڕاستەقینە نییە.';
                 } else {
-                    $product_message = 'Image upload failed.';
+                    lockDownUploadsFolder($targetDir);
+                    if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+                        $img = 'uploads/products/' . $fileName;
+                    } else {
+                        $product_message = 'Image upload failed.';
+                    }
                 }
             } else {
                 $product_message = 'Please upload an image smaller than 2MB.';
@@ -1676,8 +1693,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $fileName = 'gallery_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
                 $targetPath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
-                if (move_uploaded_file($tmp, $targetPath)) {
-                    $galleryPaths[] = 'uploads/products/' . $fileName;
+                if (!isGenuineImageUpload($tmp)) {
+                    $product_message = 'یەکێک لە فایلەکان وێنەی ڕاستەقینە نییە!';
+                } else {
+                    lockDownUploadsFolder($targetDir);
+                    if (move_uploaded_file($tmp, $targetPath)) {
+                        $galleryPaths[] = 'uploads/products/' . $fileName;
+                    }
                 }
             }
         }
@@ -1927,14 +1949,6 @@ if ($shopSlug !== '') {
 $workspaces = fetchWorkspaces($pdo, $search);
 
 /* -------------------------
-   Helper: fetch rating (simple random for prototype)
-   ------------------------- */
-function getRatingForWorkspace($id) {
-    // deterministic pseudo-random for demo
-    return 3 + ($id % 3); // 3,4,5
-}
-
-/* -------------------------
    Helper: fetch products count
    ------------------------- */
 function productsCount(PDO $pdo, $workspace_id) {
@@ -2114,7 +2128,6 @@ function qrDataUrl(string $text): string {
     .btn-ghost{ background:transparent; border:1px solid var(--border); padding:6px 10px; border-radius:10px; color:var(--btn-text); transition:all .2s ease; }
     .btn-ghost:hover{ background:rgba(255,255,255,0.05); transform:translateY(-1px); }
     body[data-theme="light"] .btn-ghost:hover{ background:rgba(15,23,42,0.05); }
-    .rating-star{ color:#ffd166; }
     .logo-sm{ width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border); }
     .pill{ background:var(--pill-bg); padding:6px 10px;border-radius:999px;font-size:13px; }
     .input-dark{ background:var(--input-bg); border:1px solid var(--border); padding:8px 10px;border-radius:8px;color:var(--input-text); }
@@ -2204,10 +2217,8 @@ function qrDataUrl(string $text): string {
             </div>
           </div>
           <nav class="site-nav">
-            <a href="#" class="text-sm">Home</a>
-            <a href="#" class="text-sm">Products</a>
-            <a href="#" class="text-sm">Solutions</a>
-            <a href="#" class="text-sm">Projects</a>
+            <a href="?q=&lang=<?= urlencode($lang) ?>" class="text-sm">Home</a>
+            <a href="?q=&lang=<?= urlencode($lang) ?>#workspaces" class="text-sm">Products</a>
             <a href="about.php?lang=<?= urlencode($lang) ?>" class="text-sm">About</a>
             <a href="about.php?lang=<?= urlencode($lang) ?>#contact" class="text-sm">Contact</a>
           </nav>
@@ -2596,9 +2607,8 @@ function qrDataUrl(string $text): string {
         <div class="small-muted mt-2"><?= e(translate('empty_subtitle', $lang, $translations)) ?></div>
       </div>
     <?php else: ?>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <?php foreach ($workspaces as $w): 
-          $rating = getRatingForWorkspace($w['id']);
+      <div id="workspaces" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <?php foreach ($workspaces as $w):
           $phone = $w['phone'] ?: $defaultPhone;
           $logo = $w['logo'] ?: $defaultLogo;
           $count = productsCount($pdo, $w['id']);
@@ -2613,12 +2623,7 @@ function qrDataUrl(string $text): string {
                     <div class="small-muted text-xs"><?= e($w['slug']) ?> • <?= sprintf(translate('products_count', $lang, $translations), $count) ?></div>
                   </div>
                   <div class="text-right">
-                    <div class="flex items-center gap-1 justify-end">
-                      <?php for ($i=0;$i<5;$i++): ?>
-                        <svg class="w-4 h-4 rating-star" fill="<?= $i < $rating ? '#ffd166' : 'none' ?>" stroke="#ffd166" viewBox="0 0 24 24"><path stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" d="M12 .587l3.668 7.431L23.5 9.75l-5.75 5.6L19.335 24 12 19.897 4.665 24l1.585-8.65L.5 9.75l7.832-1.732L12 .587z"/></svg>
-                      <?php endfor; ?>
-                    </div>
-                    <div class="small-muted text-xs mt-1"><?= e($phone) ?></div>
+                    <div class="small-muted text-xs"><?= e($phone) ?></div>
                   </div>
                 </div>
 
