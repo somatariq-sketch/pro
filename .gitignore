@@ -1,0 +1,5 @@
+/uploads/
+/.claude/
+/rony/
+config.local.php
+*.log
