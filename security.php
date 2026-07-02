@@ -28,15 +28,16 @@
 if (file_exists(__DIR__ . '/config.local.php')) {
     require __DIR__ . '/config.local.php';
 } else {
-    error_log('SECURITY WARNING: config.local.php is missing — falling back to the default ADMIN_SETUP_KEY. Create config.local.php before deploying.');
+    error_log('SECURITY WARNING: config.local.php is missing — admin account bootstrap is disabled until it is created.');
 }
 
 // One-time secret required to ever bootstrap (create) the admin account.
-// Set this to a long random string, deploy, create the admin account once,
-// then you may delete/blank this constant again since it is never needed
-// after the admin row already exists.
+// Real value lives in config.local.php (gitignored). If that file is
+// missing, fail closed with a fresh per-process value instead of falling
+// back to any fixed/known string, so bootstrap simply can't succeed until
+// config.local.php is created.
 if (!defined('ADMIN_SETUP_KEY')) {
-    define('ADMIN_SETUP_KEY', 'boma85@PESHaWA#3');
+    define('ADMIN_SETUP_KEY', bin2hex(random_bytes(32)));
 }
 
 define('LOGIN_MAX_ATTEMPTS', 5);      // failed attempts allowed
